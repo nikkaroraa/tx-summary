@@ -57,6 +57,20 @@ const KNOWN_SELECTORS: Record<string, { name: string; signature: string }> = {
   '0xf2b9fdb8': { name: 'supply', signature: 'supply(address,uint256)' },
   '0xf3fef3a3': { name: 'withdraw', signature: 'withdraw(address,uint256)' },
   
+  // Morpho Blue
+  '0x50d8cd4b': { name: 'supply', signature: 'supply((address,address,address,address,uint256),uint256,uint256,address,bytes)' },
+  '0x5c2bea49': { name: 'withdraw', signature: 'withdraw((address,address,address,address,uint256),uint256,uint256,address,address)' },
+  '0x6c7ac9d8': { name: 'borrow', signature: 'borrow((address,address,address,address,uint256),uint256,uint256,address,address)' },
+  '0x20b76e81': { name: 'repay', signature: 'repay((address,address,address,address,uint256),uint256,uint256,address,bytes)' },
+  '0xd8efab88': { name: 'supplyCollateral', signature: 'supplyCollateral((address,address,address,address,uint256),uint256,address,bytes)' },
+  '0xaed0a0e2': { name: 'withdrawCollateral', signature: 'withdrawCollateral((address,address,address,address,uint256),uint256,address,address)' },
+  '0x1c3db2e0': { name: 'liquidate', signature: 'liquidate((address,address,address,address,uint256),address,uint256,uint256,bytes)' },
+  '0xe0232b42': { name: 'flashLoan', signature: 'flashLoan(address,address,uint256,bytes)' },
+  
+  // Sushi RouteProcessor
+  '0x2646478b': { name: 'processRoute', signature: 'processRoute(address,uint256,address,uint256,address,bytes)' },
+  '0x0b0d7b9d': { name: 'transferValueAndprocessRoute', signature: 'transferValueAndprocessRoute(address,uint256,address,uint256,address,bytes)' },
+  
   // NFT ERC721
   '0x42842e0e': { name: 'safeTransferFrom', signature: 'safeTransferFrom(address,address,uint256)' },
   '0xb88d4fde': { name: 'safeTransferFrom', signature: 'safeTransferFrom(address,address,uint256,bytes)' },
@@ -248,6 +262,40 @@ const KNOWN_CONTRACTS: Record<string, string> = {
   
   // === Other ===
   '0x00000000219ab540356cbb839cbe05303d7705fa': 'ETH2 Deposit Contract',
+  
+  // ==========================================
+  // === KATANA NETWORK CONTRACTS ===
+  // ==========================================
+  
+  // === Sushi on Katana ===
+  '0x72d111b4d6f31b38919ae39779f570b747d6acd9': 'Sushi V2 Factory',
+  '0x69cc349932ae18ed406eeb917d79b9b3033fb68e': 'Sushi V2 Router',
+  '0x203e8740894c8955cb8950759876d7e7e45e04c1': 'Sushi V3 Factory',
+  '0x2659c6085d26144117d904c46b48b6d180393d27': 'Sushi V3 Positions',
+  '0x4e1d81a3e627b9294532e990109e4c21d217376c': 'Sushi V3 Router',
+  '0x3ced11c610556e5292fbc2e75d68c3899098c14c': 'Sushi RouteProcessor',
+  '0xac4c6e212a361c968f1725b4d055b47e63f80b75': 'Sushi RedSnwapper',
+  
+  // === Morpho on Katana ===
+  '0xd50f2dfffd62f94ee4aed9ca05c61d0753268abc': 'Morpho',
+  '0xd3f39505d0c48afed3549d625982fdc38ea9904b': 'MetaMorpho Factory',
+  '0xa8c5e23c9c0df2b6ff716486c6bbebb6661548c8': 'Morpho Bundler',
+  '0x4f708c0ae7ded3d74736594c2109c2e3c065b428': 'Morpho AdaptiveCurveIrm',
+  '0x39eb6da5e88194c82b13491df2e8b3e213ed2412': 'Morpho PublicAllocator',
+  
+  // === Agglayer Bridge on Katana ===
+  '0x2a3dd3eb832af982ec71669e178424b10dca2ede': 'Katana Unified Bridge',
+  '0x64b20eb25aed030fd510ef93b9135278b152f6a6': 'Katana Bridge & Call',
+  
+  // === Vault Bridge Converters ===
+  '0xa6b0db1293144ebe9478b6a84f75dd651e45914a': 'WETH Converter',
+  '0x97a3500083348a147f419b8a65717909762c389f': 'USDC Converter',
+  '0x053fa9b934b83e1e0ffc7e98a41aadc3640bb462': 'USDT Converter',
+  '0xb00aa68b87256e2f22058fb2ba3246eec54a44fc': 'WBTC Converter',
+  
+  // === Helper Contracts ===
+  '0xca11bde05977b3631167028862be2a173976ca11': 'Multicall3',
+  '0x0000000000000068f116a894984e2db1123eb395': 'Seaport 1.6',
 };
 
 // Known tokens with symbols and decimals
@@ -306,6 +354,30 @@ const KNOWN_TOKENS: Record<string, { symbol: string; decimals: number; name?: st
   '0xaea46a60368a7bd060eec7df8cba43b7ef41ad85': { symbol: 'FET', decimals: 18, name: 'Fetch.ai' },
   '0x6de037ef9ad2725eb40118bb1702ebb27e4aeb24': { symbol: 'RNDR', decimals: 18, name: 'Render' },
   '0x163f8c2467924be0ae7b5347228cabf260318753': { symbol: 'WLD', decimals: 18, name: 'Worldcoin' },
+  
+  // ==========================================
+  // === KATANA NETWORK TOKENS ===
+  // ==========================================
+  '0x7f1f4b4b29f5058fa32cc7a97141b8d7e5abdc2d': { symbol: 'KAT', decimals: 18, name: 'Katana' },
+  '0xee7d8bcfb72bc1880d0cf19822eb0a2e6577ab62': { symbol: 'WETH', decimals: 18, name: 'Wrapped ETH (Katana)' },
+  '0x0913da6da4b42f538b445599b46bb4622342cf52': { symbol: 'WBTC', decimals: 8, name: 'Wrapped BTC (Katana)' },
+  '0x203a662b0bd271a6ed5a60edfbd04bfce608fd36': { symbol: 'USDC', decimals: 6, name: 'USD Coin (Katana)' },
+  '0x2dca96907fde857dd3d816880a0df407eeb2d2f2': { symbol: 'USDT', decimals: 6, name: 'Tether (Katana)' },
+  '0x62d6a123e8d19d06d68cf0d2294f9a3a0362c6b3': { symbol: 'USDS', decimals: 18, name: 'USDS (Katana)' },
+  '0x00000000efe302beaa2b3e6e1b18d08d69a9012a': { symbol: 'AUSD', decimals: 18, name: 'Agora USD' },
+  '0x6c16e26013f2431e8b2e1ba7067ecccad0db6c52': { symbol: 'jitoSOL', decimals: 9, name: 'Jito Staked SOL' },
+  '0x1e5efca3d0db2c6d5c67a4491845c43253eb9e4e': { symbol: 'MORPHO', decimals: 18, name: 'Morpho Token' },
+  '0x17bff452dae47e07cea877ff0e1aba17eb62b0ab': { symbol: 'SUSHI', decimals: 18, name: 'SushiSwap (Katana)' },
+  '0x476eacd417cd65421bd34fca054377658bb5e02b': { symbol: 'YFI', decimals: 18, name: 'yearn.finance (Katana)' },
+  '0x7fb4d0f51544f24f385a421db6e7d4fc71ad8e5c': { symbol: 'wstETH', decimals: 18, name: 'Wrapped stETH (Katana)' },
+  '0x9893989433e7a383cb313953e4c2365107dc19a7': { symbol: 'weETH', decimals: 18, name: 'Wrapped eETH (Katana)' },
+  '0xb24e3035d1fcbc0e43cf3143c3fd92e53df2009b': { symbol: 'POL', decimals: 18, name: 'Polygon (Katana)' },
+  '0xb0f70c0bd6fd87dbeb7c10dc692a2a6106817072': { symbol: 'BTCK', decimals: 18, name: 'Bitcoin Katana' },
+  '0xecac9c5f704e954931349da37f60e39f515c11c1': { symbol: 'LBTC', decimals: 8, name: 'Lombard BTC' },
+  '0x9b8df6e244526ab5f6e6400d331db28c8fdddb55': { symbol: 'uSOL', decimals: 9, name: 'Universal SOL' },
+  '0xb0505e5a99abd03d94a1169e638b78edfed26ea4': { symbol: 'uSUI', decimals: 9, name: 'Universal SUI' },
+  '0xa3a34a0d9a08ccddb6ed422ac0a28a06731335aa': { symbol: 'uADA', decimals: 6, name: 'Universal ADA' },
+  '0x2615a94df961278dcbc41fb0a54fec5f10a693ae': { symbol: 'uXRP', decimals: 6, name: 'Universal XRP' },
 };
 
 // Transfer event topic

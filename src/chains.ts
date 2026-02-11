@@ -3,7 +3,7 @@ import { mainnet } from 'viem/chains';
 
 // Katana chain definition
 export const katana: Chain = {
-  id: 17777,
+  id: 747474,
   name: 'Katana',
   nativeCurrency: {
     decimals: 18,
@@ -14,7 +14,7 @@ export const katana: Chain = {
     default: { http: ['https://rpc.katana.network'] },
   },
   blockExplorers: {
-    default: { name: 'Katana Explorer', url: 'https://explorer.katana.network' },
+    default: { name: 'KatanaScan', url: 'https://katanascan.com' },
   },
 };
 

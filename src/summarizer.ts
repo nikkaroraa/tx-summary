@@ -142,9 +142,12 @@ export function summarize(decoded: DecodedTx): string {
       break;
     }
     
-    // Aave / Lending
-    case 'supply': {
-      const protocol = contractName?.includes('Aave') ? 'Aave' : 
+    // Aave / Morpho / Lending
+    case 'supply':
+    case 'supplyCollateral': {
+      const protocol = contractName?.includes('Morpho') ? 'Morpho' :
+                       contractName?.includes('MetaMorpho') ? 'Morpho' :
+                       contractName?.includes('Aave') ? 'Aave' : 
                        contractName?.includes('Compound') ? 'Compound' : 
                        contractName?.includes('Spark') ? 'Spark' : 
                        contractName || 'lending protocol';
@@ -156,7 +159,9 @@ export function summarize(decoded: DecodedTx): string {
     }
     
     case 'borrow': {
-      const protocol = contractName?.includes('Aave') ? 'Aave' : 
+      const protocol = contractName?.includes('Morpho') ? 'Morpho' :
+                       contractName?.includes('MetaMorpho') ? 'Morpho' :
+                       contractName?.includes('Aave') ? 'Aave' : 
                        contractName?.includes('Compound') ? 'Compound' : 
                        contractName?.includes('Spark') ? 'Spark' : 
                        contractName || 'lending protocol';
@@ -168,7 +173,9 @@ export function summarize(decoded: DecodedTx): string {
     }
     
     case 'repay': {
-      const protocol = contractName?.includes('Aave') ? 'Aave' : 
+      const protocol = contractName?.includes('Morpho') ? 'Morpho' :
+                       contractName?.includes('MetaMorpho') ? 'Morpho' :
+                       contractName?.includes('Aave') ? 'Aave' : 
                        contractName?.includes('Compound') ? 'Compound' : 
                        contractName?.includes('Spark') ? 'Spark' : 
                        contractName || 'lending protocol';
@@ -179,12 +186,36 @@ export function summarize(decoded: DecodedTx): string {
       return `${statusPrefix}Repaid ${protocol} loan`;
     }
     
+    case 'withdrawCollateral': {
+      const protocol = contractName?.includes('Morpho') ? 'Morpho' : contractName || 'lending protocol';
+      const transfer = transfers.find(t => t.to.toLowerCase() === from.toLowerCase());
+      if (transfer) {
+        return `${statusPrefix}Withdrew ${formatAmount(transfer.amount, transfer.tokenSymbol)} collateral from ${protocol}`;
+      }
+      return `${statusPrefix}Withdrew collateral from ${protocol}`;
+    }
+    
+    case 'liquidate':
     case 'liquidationCall': {
-      return `${statusPrefix}Liquidated position on ${contractName || 'lending protocol'}`;
+      const protocol = contractName?.includes('Morpho') ? 'Morpho' : contractName || 'lending protocol';
+      return `${statusPrefix}Liquidated position on ${protocol}`;
     }
     
     case 'flashLoan': {
-      return `${statusPrefix}Executed flash loan on ${contractName || 'lending protocol'}`;
+      const protocol = contractName?.includes('Morpho') ? 'Morpho' : contractName || 'lending protocol';
+      return `${statusPrefix}Executed flash loan on ${protocol}`;
+    }
+    
+    // Sushi RouteProcessor
+    case 'processRoute':
+    case 'transferValueAndprocessRoute': {
+      const swapPattern = identifySwap(transfers, from);
+      if (swapPattern) {
+        const inAmt = formatAmount(swapPattern.in.amount, swapPattern.in.tokenSymbol);
+        const outAmt = formatAmount(swapPattern.out.amount, swapPattern.out.tokenSymbol);
+        return `${statusPrefix}Swapped ${outAmt} → ${inAmt} via ${contractName || 'Sushi'}`;
+      }
+      return `${statusPrefix}Swapped via ${contractName || 'Sushi'}`;
     }
     
     // Transfers
