@@ -1,5 +1,5 @@
 import { formatEther } from 'viem';
-import type { DecodedTx, Transfer } from './decoder.js';
+import type { DecodedTx, Transfer, NFTTransfer } from './decoder.js';
 
 function formatAddress(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -16,21 +16,47 @@ function formatAmount(amount: string, symbol: string): string {
 }
 
 function identifySwap(transfers: Transfer[], from: string): { in: Transfer; out: Transfer } | null {
-  // Look for a pattern: user sends token A, receives token B
   const fromLower = from.toLowerCase();
   
   const sent = transfers.find(t => t.from.toLowerCase() === fromLower);
   const received = transfers.find(t => t.to.toLowerCase() === fromLower);
   
-  if (sent && received && sent.token !== received.token) {
+  if (sent && received && sent.token.toLowerCase() !== received.token.toLowerCase()) {
     return { out: sent, in: received };
   }
   
   return null;
 }
 
+function summarizeNFTTransfer(nft: NFTTransfer, from: string, to: string | null): string {
+  const collectionName = nft.contractName || formatAddress(nft.contract);
+  const isMint = nft.from.toLowerCase() === '0x0000000000000000000000000000000000000000';
+  const isBurn = nft.to.toLowerCase() === '0x0000000000000000000000000000000000000000';
+  
+  if (isMint) {
+    return `Minted ${collectionName} #${nft.tokenId}`;
+  }
+  if (isBurn) {
+    return `Burned ${collectionName} #${nft.tokenId}`;
+  }
+  
+  // Check if user is sender or receiver
+  const userIsSender = nft.from.toLowerCase() === from.toLowerCase();
+  const userIsReceiver = nft.to.toLowerCase() === from.toLowerCase();
+  
+  if (userIsReceiver && !userIsSender) {
+    return `Received ${collectionName} #${nft.tokenId}`;
+  }
+  
+  if (nft.standard === 'ERC1155' && nft.amount > 1n) {
+    return `Transferred ${nft.amount.toString()}x ${collectionName} #${nft.tokenId} → ${formatAddress(nft.to)}`;
+  }
+  
+  return `Transferred ${collectionName} #${nft.tokenId} → ${formatAddress(nft.to)}`;
+}
+
 export function summarize(decoded: DecodedTx): string {
-  const { from, to, value, functionName, contractName, isContractCreation, status, transfers } = decoded;
+  const { from, to, value, functionName, contractName, isContractCreation, status, transfers, nftTransfers } = decoded;
   
   // Status prefix for failed txs
   const statusPrefix = status === 'failed' ? '❌ FAILED: ' : '';
@@ -38,6 +64,31 @@ export function summarize(decoded: DecodedTx): string {
   // Contract creation
   if (isContractCreation) {
     return `${statusPrefix}Deployed new contract`;
+  }
+  
+  // NFT transfers take priority (except for swaps)
+  if (nftTransfers.length > 0 && functionName !== 'execute' && functionName !== 'multicall') {
+    // Check for NFT purchase (has ETH value or token transfer + NFT received)
+    const nftReceived = nftTransfers.find(n => n.to.toLowerCase() === from.toLowerCase());
+    
+    if (nftReceived && (value > 0n || transfers.some(t => t.from.toLowerCase() === from.toLowerCase()))) {
+      const collection = nftReceived.contractName || formatAddress(nftReceived.contract);
+      if (value > 0n) {
+        return `${statusPrefix}Bought ${collection} #${nftReceived.tokenId} for ${formatAmount(formatEther(value), 'ETH')}`;
+      }
+      const payment = transfers.find(t => t.from.toLowerCase() === from.toLowerCase());
+      if (payment) {
+        return `${statusPrefix}Bought ${collection} #${nftReceived.tokenId} for ${formatAmount(payment.amount, payment.tokenSymbol)}`;
+      }
+    }
+    
+    // Simple NFT transfer
+    if (nftTransfers.length === 1) {
+      return `${statusPrefix}${summarizeNFTTransfer(nftTransfers[0], from, to)}`;
+    }
+    
+    // Multiple NFT transfers
+    return `${statusPrefix}Transferred ${nftTransfers.length} NFTs`;
   }
   
   // Native ETH transfer (no data)
@@ -59,55 +110,85 @@ export function summarize(decoded: DecodedTx): string {
   switch (functionName) {
     // Approvals
     case 'approve': {
-      const transfer = transfers[0];
-      if (transfer) {
-        return `${statusPrefix}Approved ${transfer.tokenSymbol} for ${contractName || formatAddress(to!)}`;
+      const targetName = contractName || formatAddress(to!);
+      // Try to find which token from the tx target
+      if (transfers.length > 0) {
+        return `${statusPrefix}Approved ${transfers[0].tokenSymbol} for ${targetName}`;
       }
-      return `${statusPrefix}Approved token for ${contractName || formatAddress(to!)}`;
+      return `${statusPrefix}Approved token for ${targetName}`;
+    }
+    
+    case 'setApprovalForAll': {
+      const targetName = contractName || formatAddress(to!);
+      return `${statusPrefix}Approved all NFTs for ${targetName}`;
     }
     
     // WETH wrap/unwrap
     case 'deposit': {
-      if (value > 0n) {
+      if (value > 0n && (contractName === 'WETH' || to?.toLowerCase() === '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2')) {
         const ethAmount = formatAmount(formatEther(value), 'ETH');
         return `${statusPrefix}Wrapped ${ethAmount} → WETH`;
       }
       break;
     }
     case 'withdraw': {
-      const transfer = transfers.find(t => t.tokenSymbol === 'WETH');
-      if (transfer) {
-        return `${statusPrefix}Unwrapped ${formatAmount(transfer.amount, 'WETH')} → ETH`;
+      if (contractName === 'WETH' || to?.toLowerCase() === '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2') {
+        const transfer = transfers.find(t => t.tokenSymbol === 'WETH');
+        if (transfer) {
+          return `${statusPrefix}Unwrapped ${formatAmount(transfer.amount, 'WETH')} → ETH`;
+        }
+        return `${statusPrefix}Unwrapped WETH → ETH`;
       }
       break;
     }
     
-    // Aave
+    // Aave / Lending
     case 'supply': {
-      const transfer = transfers.find(t => t.to.toLowerCase() !== from.toLowerCase());
-      if (transfer) {
-        return `${statusPrefix}Supplied ${formatAmount(transfer.amount, transfer.tokenSymbol)} to Aave`;
-      }
-      return `${statusPrefix}Supplied to Aave`;
-    }
-    case 'borrow': {
-      const transfer = transfers.find(t => t.to.toLowerCase() === from.toLowerCase());
-      if (transfer) {
-        return `${statusPrefix}Borrowed ${formatAmount(transfer.amount, transfer.tokenSymbol)} from Aave`;
-      }
-      return `${statusPrefix}Borrowed from Aave`;
-    }
-    case 'repay': {
+      const protocol = contractName?.includes('Aave') ? 'Aave' : 
+                       contractName?.includes('Compound') ? 'Compound' : 
+                       contractName?.includes('Spark') ? 'Spark' : 
+                       contractName || 'lending protocol';
       const transfer = transfers.find(t => t.from.toLowerCase() === from.toLowerCase());
       if (transfer) {
-        return `${statusPrefix}Repaid ${formatAmount(transfer.amount, transfer.tokenSymbol)} to Aave`;
+        return `${statusPrefix}Supplied ${formatAmount(transfer.amount, transfer.tokenSymbol)} to ${protocol}`;
       }
-      return `${statusPrefix}Repaid Aave loan`;
+      return `${statusPrefix}Supplied to ${protocol}`;
+    }
+    
+    case 'borrow': {
+      const protocol = contractName?.includes('Aave') ? 'Aave' : 
+                       contractName?.includes('Compound') ? 'Compound' : 
+                       contractName?.includes('Spark') ? 'Spark' : 
+                       contractName || 'lending protocol';
+      const transfer = transfers.find(t => t.to.toLowerCase() === from.toLowerCase());
+      if (transfer) {
+        return `${statusPrefix}Borrowed ${formatAmount(transfer.amount, transfer.tokenSymbol)} from ${protocol}`;
+      }
+      return `${statusPrefix}Borrowed from ${protocol}`;
+    }
+    
+    case 'repay': {
+      const protocol = contractName?.includes('Aave') ? 'Aave' : 
+                       contractName?.includes('Compound') ? 'Compound' : 
+                       contractName?.includes('Spark') ? 'Spark' : 
+                       contractName || 'lending protocol';
+      const transfer = transfers.find(t => t.from.toLowerCase() === from.toLowerCase());
+      if (transfer) {
+        return `${statusPrefix}Repaid ${formatAmount(transfer.amount, transfer.tokenSymbol)} to ${protocol}`;
+      }
+      return `${statusPrefix}Repaid ${protocol} loan`;
+    }
+    
+    case 'liquidationCall': {
+      return `${statusPrefix}Liquidated position on ${contractName || 'lending protocol'}`;
+    }
+    
+    case 'flashLoan': {
+      return `${statusPrefix}Executed flash loan on ${contractName || 'lending protocol'}`;
     }
     
     // Transfers
-    case 'transfer':
-    case 'transferFrom': {
+    case 'transfer': {
       const transfer = transfers[0];
       if (transfer) {
         return `${statusPrefix}Sent ${formatAmount(transfer.amount, transfer.tokenSymbol)} → ${formatAddress(transfer.to)}`;
@@ -115,12 +196,69 @@ export function summarize(decoded: DecodedTx): string {
       break;
     }
     
-    // NFT transfers
-    case 'safeTransferFrom': {
-      return `${statusPrefix}Transferred NFT → ${formatAddress(to!)}`;
+    case 'transferFrom': {
+      const transfer = transfers[0];
+      if (transfer) {
+        // Check if this is a token transfer or NFT
+        if (nftTransfers.length > 0) {
+          return `${statusPrefix}${summarizeNFTTransfer(nftTransfers[0], from, to)}`;
+        }
+        return `${statusPrefix}Sent ${formatAmount(transfer.amount, transfer.tokenSymbol)} → ${formatAddress(transfer.to)}`;
+      }
+      break;
     }
     
-    // Uniswap multicall / execute
+    // NFT transfers
+    case 'safeTransferFrom': {
+      if (nftTransfers.length > 0) {
+        return `${statusPrefix}${summarizeNFTTransfer(nftTransfers[0], from, to)}`;
+      }
+      return `${statusPrefix}Transferred NFT`;
+    }
+    
+    case 'safeBatchTransferFrom': {
+      if (nftTransfers.length > 0) {
+        return `${statusPrefix}Transferred ${nftTransfers.length} NFTs`;
+      }
+      return `${statusPrefix}Batch transferred NFTs`;
+    }
+    
+    // OpenSea / NFT Marketplace
+    case 'fulfillBasicOrder':
+    case 'fulfillOrder':
+    case 'fulfillAdvancedOrder': {
+      if (nftTransfers.length > 0) {
+        const nftReceived = nftTransfers.find(n => n.to.toLowerCase() === from.toLowerCase());
+        if (nftReceived) {
+          const collection = nftReceived.contractName || formatAddress(nftReceived.contract);
+          if (value > 0n) {
+            return `${statusPrefix}Bought ${collection} #${nftReceived.tokenId} for ${formatAmount(formatEther(value), 'ETH')} on OpenSea`;
+          }
+        }
+      }
+      return `${statusPrefix}Executed trade on OpenSea`;
+    }
+    
+    // Liquidity
+    case 'addLiquidity':
+    case 'addLiquidityETH': {
+      const dex = contractName || 'DEX';
+      if (transfers.length >= 2) {
+        return `${statusPrefix}Added ${transfers[0].tokenSymbol}/${transfers[1].tokenSymbol} liquidity to ${dex}`;
+      }
+      return `${statusPrefix}Added liquidity to ${dex}`;
+    }
+    
+    case 'removeLiquidity':
+    case 'removeLiquidityETH': {
+      const dex = contractName || 'DEX';
+      if (transfers.length >= 2) {
+        return `${statusPrefix}Removed ${transfers[0].tokenSymbol}/${transfers[1].tokenSymbol} liquidity from ${dex}`;
+      }
+      return `${statusPrefix}Removed liquidity from ${dex}`;
+    }
+    
+    // Uniswap/DEX multicall / execute
     case 'multicall':
     case 'execute': {
       // Re-check for swap pattern in case it wasn't caught earlier
@@ -128,8 +266,20 @@ export function summarize(decoded: DecodedTx): string {
       if (swapPattern) {
         const inAmt = formatAmount(swapPattern.in.amount, swapPattern.in.tokenSymbol);
         const outAmt = formatAmount(swapPattern.out.amount, swapPattern.out.tokenSymbol);
-        return `${statusPrefix}Swapped ${outAmt} → ${inAmt} via ${contractName || 'Uniswap'}`;
+        return `${statusPrefix}Swapped ${outAmt} → ${inAmt} via ${contractName || 'DEX'}`;
       }
+      
+      // Check for NFT trades in execute
+      if (nftTransfers.length > 0) {
+        const nftReceived = nftTransfers.find(n => n.to.toLowerCase() === from.toLowerCase());
+        if (nftReceived && (value > 0n || transfers.some(t => t.from.toLowerCase() === from.toLowerCase()))) {
+          const collection = nftReceived.contractName || formatAddress(nftReceived.contract);
+          if (value > 0n) {
+            return `${statusPrefix}Bought ${collection} #${nftReceived.tokenId} for ${formatAmount(formatEther(value), 'ETH')}`;
+          }
+        }
+      }
+      
       // Check for multiple transfers
       if (transfers.length > 0) {
         const received = transfers.filter(t => t.to.toLowerCase() === from.toLowerCase());
@@ -139,6 +289,60 @@ export function summarize(decoded: DecodedTx): string {
         }
       }
       break;
+    }
+    
+    // Swaps
+    case 'swapExactETHForTokens':
+    case 'swapETHForExactTokens': {
+      const received = transfers.find(t => t.to.toLowerCase() === from.toLowerCase());
+      if (received && value > 0n) {
+        return `${statusPrefix}Swapped ${formatAmount(formatEther(value), 'ETH')} → ${formatAmount(received.amount, received.tokenSymbol)} via ${contractName || 'DEX'}`;
+      }
+      break;
+    }
+    
+    case 'swapExactTokensForETH':
+    case 'swapTokensForExactETH': {
+      const sent = transfers.find(t => t.from.toLowerCase() === from.toLowerCase());
+      if (sent) {
+        const ethReceived = transfers.find(t => t.tokenSymbol === 'WETH' && t.to.toLowerCase() === from.toLowerCase());
+        if (ethReceived) {
+          return `${statusPrefix}Swapped ${formatAmount(sent.amount, sent.tokenSymbol)} → ${formatAmount(ethReceived.amount, 'ETH')} via ${contractName || 'DEX'}`;
+        }
+      }
+      break;
+    }
+    
+    case 'swapExactTokensForTokens':
+    case 'exactInputSingle':
+    case 'exactInput':
+    case 'exactOutputSingle':
+    case 'exactOutput':
+    case 'swap':
+    case 'uniswapV3Swap':
+    case 'unoswap': {
+      const swapPattern = identifySwap(transfers, from);
+      if (swapPattern) {
+        const inAmt = formatAmount(swapPattern.in.amount, swapPattern.in.tokenSymbol);
+        const outAmt = formatAmount(swapPattern.out.amount, swapPattern.out.tokenSymbol);
+        return `${statusPrefix}Swapped ${outAmt} → ${inAmt} via ${contractName || 'DEX'}`;
+      }
+      break;
+    }
+    
+    // Bridge
+    case 'depositETH':
+    case 'bridgeETH': {
+      if (value > 0n) {
+        return `${statusPrefix}Bridged ${formatAmount(formatEther(value), 'ETH')} via ${contractName || 'bridge'}`;
+      }
+      break;
+    }
+    
+    // Permit2
+    case 'permit':
+    case 'permitTransferFrom': {
+      return `${statusPrefix}Signed permit for ${contractName || formatAddress(to!)}`;
     }
   }
   
