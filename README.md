@@ -44,6 +44,29 @@ tx-summary 0x... --json
 | `mainnet`  | Public Llama RPC           |
 | `katana`   | https://rpc.katana.network |
 
+### Katana First-Class Support 🔥
+
+tx-summary has deep integration with the Katana DeFi ecosystem:
+
+**Protocols:**
+- **Sushi** - V2/V3 routers, RouteProcessor swaps
+- **Morpho** - Supply, borrow, repay, liquidate, flash loans
+- **Vault Bridge** - Cross-chain token converters
+- **Agglayer** - Unified bridge
+
+**Tokens:**
+- Native: KAT, AUSD (Agora USD)
+- Bridged: WETH, WBTC, USDC, USDT, USDS (vb tokens)
+- Staking: wstETH, weETH, jitoSOL
+- Universal: uSOL, uSUI, uADA, uXRP
+
+```bash
+# Example Katana usage
+tx-summary 0x... --chain katana
+→ "Supplied 1,000.00 USDC to Morpho"
+→ "Swapped 100.00 USDC → 0.04 ETH via Sushi RouteProcessor"
+```
+
 ## What It Detects
 
 ### DeFi
@@ -121,12 +144,18 @@ console.log(decoded.contractName); // Known contract name if recognized
 
 tx-summary recognizes 100+ contracts including:
 
+**Ethereum Mainnet:**
 - **DEXes**: Uniswap V2/V3, SushiSwap, 1inch, 0x, Cowswap, Curve, Balancer, Paraswap, KyberSwap
-- **Lending**: Aave V2/V3, Compound V3, Spark, Morpho
+- **Lending**: Aave V2/V3, Compound V3, Spark, Morpho Blue
 - **Staking**: Lido, Rocket Pool, Frax, Coinbase
 - **NFT**: OpenSea, Blur, LooksRare, X2Y2, Sudoswap
 - **Bridges**: Across, Stargate, Hop, Arbitrum, Optimism, Polygon, zkSync
 - **Other**: ENS, Permit2, Gnosis Safe
+
+**Katana Network:**
+- **DEXes**: Sushi V2/V3, RouteProcessor, RedSnwapper
+- **Lending**: Morpho Blue, MetaMorpho, Bundler
+- **Bridges**: Vault Bridge, Unified Bridge, Token Converters
 
 ## Known Tokens
 
