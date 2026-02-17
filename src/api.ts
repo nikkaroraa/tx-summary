@@ -1,6 +1,6 @@
-import { type Hex } from 'viem';
+import { type Hex, formatEther, formatUnits } from 'viem';
 import { getClient } from './chains.js';
-import { decodeTx } from './decoder.js';
+import { decodeTx, type Transfer, type NFTTransfer } from './decoder.js';
 import { summarize } from './summarizer.js';
 
 export interface SummarizeOptions {
@@ -15,6 +15,15 @@ export interface SummaryResult {
   to: string | null;
   status: 'success' | 'failed' | 'pending';
   blockNumber: bigint | null;
+  timestamp: number | null;
+  value: string;
+  gasUsed: string | null;
+  gasCost: string | null;
+  functionName: string | null;
+  contractName: string | null;
+  transfers: Transfer[];
+  nftTransfers: NFTTransfer[];
+  nonce: number;
 }
 
 /**
@@ -53,6 +62,20 @@ export async function summarizeTx(
 
   const summary = summarize(decoded);
 
+  // Fetch block for timestamp
+  let timestamp: number | null = null;
+  if (tx.blockNumber) {
+    try {
+      const block = await client.getBlock({ blockNumber: tx.blockNumber });
+      timestamp = Number(block.timestamp);
+    } catch {}
+  }
+
+  // Calculate gas cost
+  const gasUsed = receipt?.gasUsed ?? null;
+  const effectiveGasPrice = receipt?.effectiveGasPrice ?? tx.gasPrice ?? null;
+  const gasCost = gasUsed && effectiveGasPrice ? gasUsed * effectiveGasPrice : null;
+
   return {
     hash: tx.hash,
     summary,
@@ -60,5 +83,14 @@ export async function summarizeTx(
     to: tx.to,
     status: decoded.status,
     blockNumber: tx.blockNumber,
+    timestamp,
+    value: formatEther(tx.value),
+    gasUsed: gasUsed?.toString() ?? null,
+    gasCost: gasCost ? formatEther(gasCost) : null,
+    functionName: decoded.functionName,
+    contractName: decoded.contractName,
+    transfers: decoded.transfers,
+    nftTransfers: decoded.nftTransfers,
+    nonce: tx.nonce,
   };
 }

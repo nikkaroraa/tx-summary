@@ -1,5 +1,6 @@
-import { formatEther } from 'viem';
+import { formatEther, formatUnits } from 'viem';
 import type { DecodedTx, Transfer, NFTTransfer } from './decoder.js';
+import { getTokenInfo } from './decoder.js';
 
 function formatAddress(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -97,6 +98,39 @@ export function summarize(decoded: DecodedTx): string {
     return `${statusPrefix}Sent ${ethAmount} → ${formatAddress(to!)}`;
   }
   
+  // ERC4626 vault operations (detect before swap — vault deposits look like swaps)
+  if (functionName === 'deposit' || functionName === 'mint' || functionName === 'redeem' || functionName === 'withdraw') {
+    const ZERO = '0x0000000000000000000000000000000000000000';
+    const fromLower = from.toLowerCase();
+    const minted = transfers.find(t => t.from.toLowerCase() === ZERO && t.to.toLowerCase() === fromLower);
+    const burned = transfers.find(t => t.to.toLowerCase() === ZERO && t.from.toLowerCase() === fromLower);
+    const isVaultDeposit = (functionName === 'deposit' || functionName === 'mint') && minted;
+    const isVaultWithdraw = (functionName === 'withdraw' || functionName === 'redeem') && burned;
+
+    if (isVaultDeposit) {
+      const deposited = transfers.find(t => t.from.toLowerCase() === fromLower && t.to.toLowerCase() !== ZERO);
+      const vaultName = contractName || 'vault';
+      // ERC4626 shares use same decimals as underlying asset
+      const underlyingDecimals = deposited ? getTokenInfo(deposited.token).decimals : 18;
+      const sharesFormatted = formatAmount(formatUnits(minted.rawAmount, underlyingDecimals), 'shares');
+      if (deposited) {
+        return `${statusPrefix}Deposited ${formatAmount(deposited.amount, deposited.tokenSymbol)} to ${vaultName} → received ${sharesFormatted}`;
+      }
+      return `${statusPrefix}Deposited to ${vaultName} → received ${sharesFormatted}`;
+    }
+
+    if (isVaultWithdraw) {
+      const received = transfers.find(t => t.to.toLowerCase() === fromLower && t.from.toLowerCase() !== ZERO);
+      const vaultName = contractName || 'vault';
+      const underlyingDecimals = received ? getTokenInfo(received.token).decimals : 18;
+      const burnedFormatted = formatAmount(formatUnits(burned.rawAmount, underlyingDecimals), 'shares');
+      if (received) {
+        return `${statusPrefix}Withdrew ${formatAmount(received.amount, received.tokenSymbol)} from ${vaultName} (burned ${burnedFormatted})`;
+      }
+      return `${statusPrefix}Withdrew from ${vaultName} (burned ${burnedFormatted})`;
+    }
+  }
+
   // Check for swap patterns
   const swap = identifySwap(transfers, from);
   if (swap) {
@@ -123,11 +157,22 @@ export function summarize(decoded: DecodedTx): string {
       return `${statusPrefix}Approved all NFTs for ${targetName}`;
     }
     
-    // WETH wrap/unwrap
+    // WETH wrap/unwrap + ERC4626 vault deposit/withdraw
     case 'deposit': {
       if (value > 0n && (contractName === 'WETH' || to?.toLowerCase() === '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2')) {
         const ethAmount = formatAmount(formatEther(value), 'ETH');
         return `${statusPrefix}Wrapped ${ethAmount} → WETH`;
+      }
+      // ERC4626 vault deposit (Yearn V3, MetaMorpho)
+      const depositVault = contractName?.includes('Yearn') ? 'Yearn Vault' :
+                           contractName?.includes('MetaMorpho') ? 'MetaMorpho Vault' :
+                           contractName?.includes('Morpho') ? 'Morpho Vault' : null;
+      if (depositVault) {
+        const transfer = transfers.find(t => t.from.toLowerCase() === from.toLowerCase());
+        if (transfer) {
+          return `${statusPrefix}Deposited ${formatAmount(transfer.amount, transfer.tokenSymbol)} to ${depositVault}`;
+        }
+        return `${statusPrefix}Deposited to ${depositVault}`;
       }
       break;
     }
@@ -139,9 +184,54 @@ export function summarize(decoded: DecodedTx): string {
         }
         return `${statusPrefix}Unwrapped WETH → ETH`;
       }
+      // ERC4626 vault withdraw (Yearn V3, MetaMorpho)
+      const withdrawVault = contractName?.includes('Yearn') ? 'Yearn Vault' :
+                            contractName?.includes('MetaMorpho') ? 'MetaMorpho Vault' :
+                            contractName?.includes('Morpho') ? 'Morpho Vault' : null;
+      if (withdrawVault) {
+        const transfer = transfers.find(t => t.to.toLowerCase() === from.toLowerCase());
+        if (transfer) {
+          return `${statusPrefix}Withdrew ${formatAmount(transfer.amount, transfer.tokenSymbol)} from ${withdrawVault}`;
+        }
+        return `${statusPrefix}Withdrew from ${withdrawVault}`;
+      }
       break;
     }
     
+    // ERC4626 vault mint/redeem (Yearn V3, MetaMorpho)
+    case 'mint': {
+      const mintVault = contractName?.includes('Yearn') ? 'Yearn Vault' :
+                        contractName?.includes('MetaMorpho') ? 'MetaMorpho Vault' :
+                        contractName?.includes('Morpho') ? 'Morpho Vault' : null;
+      if (mintVault) {
+        const transfer = transfers.find(t => t.from.toLowerCase() === from.toLowerCase());
+        if (transfer) {
+          return `${statusPrefix}Deposited ${formatAmount(transfer.amount, transfer.tokenSymbol)} to ${mintVault}`;
+        }
+        return `${statusPrefix}Minted shares from ${mintVault}`;
+      }
+      break;
+    }
+
+    case 'redeem': {
+      const redeemVault = contractName?.includes('Yearn') ? 'Yearn Vault' :
+                          contractName?.includes('MetaMorpho') ? 'MetaMorpho Vault' :
+                          contractName?.includes('Morpho') ? 'Morpho Vault' : null;
+      if (redeemVault) {
+        const transfer = transfers.find(t => t.to.toLowerCase() === from.toLowerCase());
+        if (transfer) {
+          return `${statusPrefix}Redeemed ${formatAmount(transfer.amount, transfer.tokenSymbol)} from ${redeemVault}`;
+        }
+        return `${statusPrefix}Redeemed shares from ${redeemVault}`;
+      }
+      break;
+    }
+
+    // Morpho market creation
+    case 'createMarket': {
+      return `${statusPrefix}Created new Morpho market`;
+    }
+
     // Aave / Morpho / Lending
     case 'supply':
     case 'supplyCollateral': {

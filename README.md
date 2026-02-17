@@ -50,9 +50,11 @@ tx-summary has deep integration with the Katana DeFi ecosystem:
 
 **Protocols:**
 - **Sushi** - V2/V3 routers, RouteProcessor swaps
-- **Morpho** - Supply, borrow, repay, liquidate, flash loans
+- **Morpho** - Supply, borrow, repay, liquidate, flash loans, MetaMorpho vaults
+- **Yearn V3** - ERC4626 vault deposits, withdrawals, mints, redeems
 - **Vault Bridge** - Cross-chain token converters
 - **Agglayer** - Unified bridge
+- **0xTrails** - Intent-based checkout (coming soon)
 
 **Tokens:**
 - Native: KAT, AUSD (Agora USD)
@@ -65,6 +67,8 @@ tx-summary has deep integration with the Katana DeFi ecosystem:
 tx-summary 0x... --chain katana
 → "Supplied 1,000.00 USDC to Morpho"
 → "Swapped 100.00 USDC → 0.04 ETH via Sushi RouteProcessor"
+→ "Deposited 1,000.00 USDC to Yearn Vault"
+→ "Deposited 500.00 DAI to MetaMorpho Vault"
 ```
 
 ## What It Detects
@@ -154,7 +158,8 @@ tx-summary recognizes 100+ contracts including:
 
 **Katana Network:**
 - **DEXes**: Sushi V2/V3, RouteProcessor, RedSnwapper
-- **Lending**: Morpho Blue, MetaMorpho, Bundler
+- **Lending**: Morpho Blue, MetaMorpho, Bundler3
+- **Vaults**: Yearn V3 (VaultFactory, TokenizedStrategy, 4626 Router)
 - **Bridges**: Vault Bridge, Unified Bridge, Token Converters
 
 ## Known Tokens
