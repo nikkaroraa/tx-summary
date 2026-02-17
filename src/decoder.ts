@@ -67,6 +67,15 @@ const KNOWN_SELECTORS: Record<string, { name: string; signature: string }> = {
   '0x1c3db2e0': { name: 'liquidate', signature: 'liquidate((address,address,address,address,uint256),address,uint256,uint256,bytes)' },
   '0xe0232b42': { name: 'flashLoan', signature: 'flashLoan(address,address,uint256,bytes)' },
   
+  // ERC4626 Vault (Yearn V3, MetaMorpho)
+  '0x6e553f65': { name: 'deposit', signature: 'deposit(uint256,address)' },
+  '0xb460af94': { name: 'withdraw', signature: 'withdraw(uint256,address,address)' },
+  '0x94bf804d': { name: 'mint', signature: 'mint(uint256,address)' },
+  '0xba087652': { name: 'redeem', signature: 'redeem(uint256,address,address)' },
+
+  // Morpho Market Creation
+  '0x8c1d18fc': { name: 'createMarket', signature: 'createMarket((address,address,address,address,uint256))' },
+
   // Sushi RouteProcessor
   '0x2646478b': { name: 'processRoute', signature: 'processRoute(address,uint256,address,uint256,address,bytes)' },
   '0x0b0d7b9d': { name: 'transferValueAndprocessRoute', signature: 'transferValueAndprocessRoute(address,uint256,address,uint256,address,bytes)' },
@@ -278,8 +287,8 @@ const KNOWN_CONTRACTS: Record<string, string> = {
   
   // === Morpho on Katana ===
   '0xd50f2dfffd62f94ee4aed9ca05c61d0753268abc': 'Morpho',
-  '0xd3f39505d0c48afed3549d625982fdc38ea9904b': 'MetaMorpho Factory',
-  '0xa8c5e23c9c0df2b6ff716486c6bbebb6661548c8': 'Morpho Bundler',
+  '0xd3f39505d0c48afed3549d625982fdc38ea9904b': 'MetaMorpho V1.1 Factory',
+  '0xa8c5e23c9c0df2b6ff716486c6bbebb6661548c8': 'Morpho Bundler3',
   '0x4f708c0ae7ded3d74736594c2109c2e3c065b428': 'Morpho AdaptiveCurveIrm',
   '0x39eb6da5e88194c82b13491df2e8b3e213ed2412': 'Morpho PublicAllocator',
   
@@ -293,6 +302,17 @@ const KNOWN_CONTRACTS: Record<string, string> = {
   '0x053fa9b934b83e1e0ffc7e98a41aadc3640bb462': 'USDT Converter',
   '0xb00aa68b87256e2f22058fb2ba3246eec54a44fc': 'WBTC Converter',
   
+  // === Yearn V3 on Katana ===
+  '0x4671394a28ff147cfcbc9c2b1aab9d3883597417': 'Yearn Role Manager',
+  '0x1f399808fe52d0e960cab84b6b54d5707ab27c8a': 'Yearn Accountant',
+  '0x770d0d1fb036483ed4abb6d53c1c88fb277d812f': 'Yearn VaultFactory',
+  '0xd377919fa87120584b21279a491f82d5265a139c': 'Yearn TokenizedStrategy',
+  '0x1112dbcf805682e828606f74ab717abf4b4fd8de': 'Yearn 4626 Router',
+  '0xd40ecf29e001c76dcc4cc0d9cd50520ce845b038': 'Yearn V3 Registry',
+  '0x93fec6639717b6215a48e5a72a162c50dcc40d68': 'Yearn AUSD Vault',
+
+  // === 0xTrails on Katana (intent-based checkout — addresses TBD) ===
+
   // === Helper Contracts ===
   '0xca11bde05977b3631167028862be2a173976ca11': 'Multicall3',
   '0x0000000000000068f116a894984e2db1123eb395': 'Seaport 1.6',
@@ -364,11 +384,12 @@ const KNOWN_TOKENS: Record<string, { symbol: string; decimals: number; name?: st
   '0x203a662b0bd271a6ed5a60edfbd04bfce608fd36': { symbol: 'USDC', decimals: 6, name: 'USD Coin (Katana)' },
   '0x2dca96907fde857dd3d816880a0df407eeb2d2f2': { symbol: 'USDT', decimals: 6, name: 'Tether (Katana)' },
   '0x62d6a123e8d19d06d68cf0d2294f9a3a0362c6b3': { symbol: 'USDS', decimals: 18, name: 'USDS (Katana)' },
-  '0x00000000efe302beaa2b3e6e1b18d08d69a9012a': { symbol: 'AUSD', decimals: 18, name: 'Agora USD' },
+  '0x00000000efe302beaa2b3e6e1b18d08d69a9012a': { symbol: 'AUSD', decimals: 6, name: 'Agora USD' },
   '0x6c16e26013f2431e8b2e1ba7067ecccad0db6c52': { symbol: 'jitoSOL', decimals: 9, name: 'Jito Staked SOL' },
   '0x1e5efca3d0db2c6d5c67a4491845c43253eb9e4e': { symbol: 'MORPHO', decimals: 18, name: 'Morpho Token' },
   '0x17bff452dae47e07cea877ff0e1aba17eb62b0ab': { symbol: 'SUSHI', decimals: 18, name: 'SushiSwap (Katana)' },
   '0x476eacd417cd65421bd34fca054377658bb5e02b': { symbol: 'YFI', decimals: 18, name: 'yearn.finance (Katana)' },
+  '0x93fec6639717b6215a48e5a72a162c50dcc40d68': { symbol: 'yvAUSD', decimals: 6, name: 'Yearn AUSD Vault' },
   '0x7fb4d0f51544f24f385a421db6e7d4fc71ad8e5c': { symbol: 'wstETH', decimals: 18, name: 'Wrapped stETH (Katana)' },
   '0x9893989433e7a383cb313953e4c2365107dc19a7': { symbol: 'weETH', decimals: 18, name: 'Wrapped eETH (Katana)' },
   '0xb24e3035d1fcbc0e43cf3143c3fd92e53df2009b': { symbol: 'POL', decimals: 18, name: 'Polygon (Katana)' },
